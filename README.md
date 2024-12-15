@@ -19,10 +19,7 @@
 Resets Cursor's free trial limitation when you see:
 
 ```
-Too many free trial accounts used on this machine.
-Please upgrade to pro. We have this limit in place
-to prevent abuse. Please let us know if you believe
-this is a mistake.
+Too many free trial accounts used on this machine. Please upgrade to pro. We have this limit in place to prevent abuse. Please let us know if you believe this is a mistake.
 ```
 
 ### 💻 System Support
@@ -52,6 +49,7 @@ The installation script will automatically:
 - Install the tool
 - Add it to system PATH
 - Clean up temporary files
+- Handle TLS/SSL and connectivity issues automatically
 
 #### Manual Installation
 
@@ -149,6 +147,7 @@ irm https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/ins
 - 安装工具
 - 添加到系统PATH
 - 清理临时文件
+- 自动处理TLS/SSL和连接问题
 
 #### 手动安装
 
@@ -203,11 +202,6 @@ irm https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/ins
 - 安全的进程终止
 - 原子文件操作
 - 错误处理和回滚
-
-## ⭐ Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yuaotian/go-cursor-help&type=Date)](https://star-history.com/#yuaotian/go-cursor-help&Date)
-
 
 ## 📄 License
 

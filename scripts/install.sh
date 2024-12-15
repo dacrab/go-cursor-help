@@ -60,42 +60,20 @@ CN_MESSAGES=(
 
 # Detect system language / 检测系统语言
 detect_language() {
-    if [[ $(locale | grep "LANG=zh_CN") ]]; then
-        echo "cn"
-    else
-        echo "en"
-    fi
+    [[ $(locale | grep "LANG=zh_CN") ]] && echo "cn" || echo "en"
 }
 
 # Get message based on language / 根据语言获取消息
 get_message() {
-    local index=$1
     local lang=$(detect_language)
-    
-    if [[ "$lang" == "cn" ]]; then
-        echo "${CN_MESSAGES[$index]}"
-    else
-        echo "${EN_MESSAGES[$index]}"
-    fi
+    [[ "$lang" == "cn" ]] && echo "${CN_MESSAGES[$1]}" || echo "${EN_MESSAGES[$1]}"
 }
 
 # Print with color / 带颜色打印
-print_status() {
-    echo -e "${BLUE}[*]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}[✓]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[!]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[✗]${NC} $1"
-    exit 1
-}
+print_status() { echo -e "${BLUE}[*]${NC} $1"; }
+print_success() { echo -e "${GREEN}[✓]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
+print_error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
 # Check and request root privileges / 检查并请求root权限
 check_root() {
@@ -112,7 +90,6 @@ check_root() {
 # Close Cursor instances / 关闭Cursor实例
 close_cursor_instances() {
     print_status "$(get_message 14)"
-    
     if pgrep -x "Cursor" >/dev/null; then
         print_status "$(get_message 15)"
         if pkill -x "Cursor" 2>/dev/null; then
@@ -127,14 +104,7 @@ close_cursor_instances() {
 # Backup storage.json / 备份storage.json
 backup_storage_json() {
     print_status "$(get_message 18)"
-    local storage_path
-    
-    if [ "$(uname)" == "Darwin" ]; then
-        storage_path="$HOME/Library/Application Support/Cursor/User/globalStorage/storage.json"
-    else
-        storage_path="$HOME/.config/Cursor/User/globalStorage/storage.json"
-    fi
-    
+    local storage_path="$HOME/$([ "$(uname)" == "Darwin" ] && echo "Library/Application Support" || echo ".config")/Cursor/User/globalStorage/storage.json"
     if [ -f "$storage_path" ]; then
         cp "$storage_path" "${storage_path}.backup"
         print_success "$(get_message 19) ${storage_path}.backup"
@@ -144,7 +114,7 @@ backup_storage_json() {
 # Detect OS / 检测操作系统
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
+        echo "darwin"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         echo "linux"
     else
@@ -154,87 +124,60 @@ detect_os() {
 
 # Get latest release version from GitHub / 从GitHub获取最新版本
 get_latest_version() {
-    local repo="yuaotian/go-cursor-help"
-    curl -s "https://api.github.com/repos/${repo}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    curl -s "https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
 }
 
-# Get the binary name based on OS and architecture / 根据操作系统和架构获取二进制文件名
-get_binary_name() {
-    OS=$(detect_os)
-    ARCH=$(uname -m)
-    VERSION=$(get_latest_version)
-    
-    case "$ARCH" in
-        x86_64)
-            echo "cursor_id_modifier_${VERSION}_${OS}_amd64"
-            ;;
-        aarch64|arm64)
-            echo "cursor_id_modifier_${VERSION}_${OS}_arm64"
-            ;;
-        *)
-            print_error "$(get_message 13) $ARCH"
-            ;;
+# Get architecture / 获取架构
+get_arch() {
+    case "$(uname -m)" in
+        x86_64) echo "amd64" ;;
+        aarch64|arm64) echo "arm64" ;;
+        *) print_error "$(get_message 13) $(uname -m)" ;;
     esac
 }
 
-# Add download progress display function
+# Download with progress / 带进度下载
 download_with_progress() {
-    local url="$1"
-    local output_file="$2"
-    
-    curl -L -f --progress-bar "$url" -o "$output_file"
-    return $?
+    curl -L -f --progress-bar "$1" -o "$2"
 }
 
-# Optimize installation function
+# Install binary / 安装二进制文件
 install_binary() {
-    OS=$(detect_os)
-    VERSION=$(get_latest_version)
-    VERSION_WITHOUT_V=${VERSION#v}  # Remove 'v' from version number
-    BINARY_NAME="cursor_id_modifier_${VERSION_WITHOUT_V}_${OS}_$(get_arch)"
-    REPO="yuaotian/go-cursor-help"
-    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
-    TMP_DIR=$(mktemp -d)
-    FINAL_BINARY_NAME="cursor-id-modifier"
-    
+    local OS=$(detect_os)
+    local VERSION=$(get_latest_version)
+    local VERSION_WITHOUT_V=${VERSION#v}
+    local BINARY_NAME="cursor_id_modifier_${VERSION_WITHOUT_V}_${OS}_$(get_arch)"
+    local DOWNLOAD_URL="https://github.com/yuaotian/go-cursor-help/releases/download/${VERSION}/${BINARY_NAME}"
+    local TMP_DIR=$(mktemp -d)
+    local FINAL_BINARY_NAME="cursor-id-modifier"
+    local INSTALL_DIR="/usr/local/bin"
+
     print_status "$(get_message 2)"
     print_status "$(get_message 3) ${DOWNLOAD_URL}"
-    
+
     if ! download_with_progress "$DOWNLOAD_URL" "$TMP_DIR/$BINARY_NAME"; then
         rm -rf "$TMP_DIR"
         print_error "$(get_message 8) $DOWNLOAD_URL"
     fi
-    
+
     if [ ! -f "$TMP_DIR/$BINARY_NAME" ]; then
         rm -rf "$TMP_DIR"
         print_error "$(get_message 9)"
     fi
-    
+
     print_status "$(get_message 4)"
-    INSTALL_DIR="/usr/local/bin"
-    
-    # Create directory if it doesn't exist
     mkdir -p "$INSTALL_DIR"
-    
-    # Move binary to installation directory
-    if ! mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$FINAL_BINARY_NAME"; then
+    if ! mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$FINAL_BINARY_NAME" || ! chmod +x "$INSTALL_DIR/$FINAL_BINARY_NAME"; then
         rm -rf "$TMP_DIR"
-        print_error "Failed to move binary to installation directory"
+        print_error "Failed to install binary"
     fi
-    
-    if ! chmod +x "$INSTALL_DIR/$FINAL_BINARY_NAME"; then
-        rm -rf "$TMP_DIR"
-        print_error "Failed to set executable permissions"
-    fi
-    
-    # Cleanup
+
     print_status "$(get_message 5)"
     rm -rf "$TMP_DIR"
-    
+
     print_success "$(get_message 6)"
     printf "${GREEN}[✓]${NC} $(get_message 7)\n" "$FINAL_BINARY_NAME"
-    
-    # Try to run the program directly
+
     if [ -x "$INSTALL_DIR/$FINAL_BINARY_NAME" ]; then
         "$INSTALL_DIR/$FINAL_BINARY_NAME" &
     else
@@ -242,52 +185,20 @@ install_binary() {
     fi
 }
 
-# Optimize architecture detection function
-get_arch() {
-    case "$(uname -m)" in
-        x86_64)
-            echo "amd64"
-            ;;
-        aarch64|arm64)
-            echo "arm64"
-            ;;
-        *)
-            print_error "$(get_message 13) $(uname -m)"
-            ;;
-    esac
-}
-
 # Check for required tools / 检查必需工具
 check_requirements() {
-    if ! command -v curl >/dev/null 2>&1; then
-        print_error "$(get_message 10)"
-    fi
-    
-    if ! command -v sudo >/dev/null 2>&1; then
-        print_error "$(get_message 11)"
-    fi
+    command -v curl >/dev/null 2>&1 || print_error "$(get_message 10)"
+    command -v sudo >/dev/null 2>&1 || print_error "$(get_message 11)"
 }
 
 # Main installation process / 主安装过程
 main() {
     print_status "$(get_message 0)"
-    
-    # Check root privileges / 检查root权限
     check_root "$@"
-    
-    # Check required tools / 检查必需工具
     check_requirements
-    
-    # Close Cursor instances / 关闭Cursor实例
     close_cursor_instances
-    
-    # Backup storage.json / 备份storage.json
     backup_storage_json
-    
-    OS=$(detect_os)
-    print_status "$(get_message 1) $OS"
-    
-    # Install the binary / 安装二进制文件
+    print_status "$(get_message 1) $(detect_os)"
     install_binary
 }
 
