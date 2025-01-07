@@ -10,8 +10,8 @@ import (
 
 // SpinnerConfig defines spinner configuration
 type SpinnerConfig struct {
-	Frames []string        // Animation frames for the spinner
-	Delay  time.Duration   // Delay between frame updates
+	Frames []string      // Animation frames for the spinner
+	Delay  time.Duration // Delay between frame updates
 }
 
 // DefaultSpinnerConfig returns the default spinner configuration
@@ -43,8 +43,6 @@ func NewSpinner(config *SpinnerConfig) *Spinner {
 	}
 }
 
-// State management
-
 // SetMessage sets the spinner message
 func (s *Spinner) SetMessage(message string) {
 	s.mu.Lock()
@@ -58,8 +56,6 @@ func (s *Spinner) IsActive() bool {
 	defer s.mu.RUnlock()
 	return s.active
 }
-
-// Control methods
 
 // Start begins the spinner animation
 func (s *Spinner) Start() {
@@ -89,8 +85,6 @@ func (s *Spinner) Stop() {
 	fmt.Print("\r") // Clear the spinner line
 }
 
-// Internal methods
-
 func (s *Spinner) run() {
 	ticker := time.NewTicker(s.config.Delay)
 	defer ticker.Stop()
@@ -98,7 +92,6 @@ func (s *Spinner) run() {
 	cyan := color.New(color.FgCyan, color.Bold)
 	message := s.message
 
-	// Print initial state
 	fmt.Printf("\r %s %s", cyan.Sprint(s.config.Frames[0]), message)
 
 	for {
@@ -116,7 +109,7 @@ func (s *Spinner) run() {
 			s.mu.RUnlock()
 
 			fmt.Printf("\r %s", cyan.Sprint(frame))
-			fmt.Printf("\033[%dG%s", 4, message) // Move cursor and print message
+			fmt.Printf("\033[%dG%s", 4, message)
 		}
 	}
 }

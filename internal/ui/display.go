@@ -28,17 +28,16 @@ func NewDisplay(spinner *Spinner) *Display {
 // ClearScreen clears the terminal screen based on OS
 func (d *Display) ClearScreen() error {
 	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
+	if runtime.GOOS == "windows" {
 		cmd = exec.Command("cmd", "/c", "cls")
-	default:
+	} else {
 		cmd = exec.Command("clear")
 	}
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
 }
 
-// Progress Indicator
+// Progress Operations
 
 // ShowProgress displays a progress message with a spinner
 func (d *Display) ShowProgress(message string) {
@@ -51,7 +50,7 @@ func (d *Display) StopProgress() {
 	d.spinner.Stop()
 }
 
-// Message Display
+// Message Operations
 
 // ShowSuccess displays success messages in green
 func (d *Display) ShowSuccess(messages ...string) {
@@ -78,11 +77,9 @@ func (d *Display) ShowPrivilegeError(messages ...string) {
 	red := color.New(color.FgRed, color.Bold)
 	yellow := color.New(color.FgYellow)
 
-	// Main error message
 	red.Println(messages[0])
 	fmt.Println()
 
-	// Additional instructions
 	for _, msg := range messages[1:] {
 		if strings.Contains(msg, "%s") {
 			exe, _ := os.Executable()

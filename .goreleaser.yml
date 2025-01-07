@@ -55,15 +55,33 @@ checksum:
   algorithm: sha256
 
 release:
-  draft: true
-  prerelease: auto
+  draft: false
+  prerelease: false
   mode: replace
   header: |
-    ## Release {{.Tag}} ({{.Date}})
+    ## Cursor ID Modifier {{.Tag}} ({{.Date}})
     
+    This release includes new features, improvements, and bug fixes.
     See [CHANGELOG.md](CHANGELOG.md) for details.
+    
+    ### Installation
+    
+    **Windows**:
+    ```powershell
+    irm https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/install.ps1 | iex
+    ```
+    
+    **Linux/macOS**:
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/install.sh | sudo bash
+    ```
   footer: |
-    **Full Changelog**: https://github.com/owner/repo/compare/{{ .PreviousTag }}...{{ .Tag }}
+    ### SHA-256 Checksums
+    ```
+    {{ .Checksums }}
+    ```
+    
+    **Full Changelog**: https://github.com/yuaotian/go-cursor-help/compare/{{ .PreviousTag }}...{{ .Tag }}
   extra_files:
     - glob: 'LICENSE*'
     - glob: 'README*'
@@ -79,14 +97,18 @@ changelog:
       - '^ci:'
       - Merge pull request
       - Merge branch
+      - '^chore:'
   groups:
-    - title: Features
+    - title: '🚀 Features'
       regexp: "^.*feat[(\\w)]*:+.*$"
       order: 0
-    - title: 'Bug fixes'
+    - title: '🐛 Bug Fixes'
       regexp: "^.*fix[(\\w)]*:+.*$"
       order: 1
-    - title: Others
+    - title: '🔧 Maintenance'
+      regexp: "^.*refactor[(\\w)]*:+.*$"
+      order: 2
+    - title: '📝 Others'
       order: 999
 
 project_name: cursor-id-modifier

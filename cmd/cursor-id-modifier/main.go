@@ -1,3 +1,4 @@
+// Package main provides functionality for modifying Cursor application identifiers
 package main
 
 import (
@@ -20,7 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Global variables
+// Global variables for command line flags and logging
 var (
 	version     = "dev"
 	setReadOnly = flag.Bool("r", false, "set storage.json to read-only mode")
@@ -28,6 +29,7 @@ var (
 	log         = logrus.New()
 )
 
+// main is the entry point of the application
 func main() {
 	setupErrorRecovery()
 	handleFlags()
@@ -36,43 +38,43 @@ func main() {
 	username := getCurrentUser()
 	log.Debug("Running as user:", username)
 
-	// Initialize components
+	// Initialize core components
 	display := ui.NewDisplay(nil)
 	configManager := initConfigManager(username)
 	generator := idgen.NewGenerator()
 	processManager := process.NewManager(nil, log)
 
-	// Check and handle privileges
+	// Check and handle privileges before proceeding
 	if err := handlePrivileges(display); err != nil {
 		return
 	}
 
-	// Setup display
 	setupDisplay(display)
 
-	text := lang.GetText()
-
-	// Handle Cursor processes
+	// Handle running Cursor processes
 	if err := handleCursorProcesses(display, processManager); err != nil {
 		return
 	}
 
-	// Handle configuration
+	// Read existing config and generate new IDs
+	text := lang.GetText()
 	oldConfig := readExistingConfig(display, configManager, text)
 	newConfig := generateNewConfig(display, generator, oldConfig, text)
 
+	// Save the new configuration
 	if err := saveConfiguration(display, configManager, newConfig); err != nil {
 		return
 	}
 
-	// Show completion messages
 	showCompletionMessages(display)
 
+	// Skip waiting for user input in automated mode
 	if os.Getenv("AUTOMATED_MODE") != "1" {
 		waitExit()
 	}
 }
 
+// setupErrorRecovery sets up panic recovery to prevent crashes
 func setupErrorRecovery() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -83,6 +85,7 @@ func setupErrorRecovery() {
 	}()
 }
 
+// handleFlags processes command line flags
 func handleFlags() {
 	flag.Parse()
 	if *showVersion {
@@ -91,6 +94,7 @@ func handleFlags() {
 	}
 }
 
+// setupLogger configures the logging system
 func setupLogger() {
 	log.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:          true,
@@ -100,6 +104,7 @@ func setupLogger() {
 	log.SetLevel(logrus.InfoLevel)
 }
 
+// getCurrentUser retrieves the current username, considering sudo if applicable
 func getCurrentUser() string {
 	if username := os.Getenv("SUDO_USER"); username != "" {
 		return username
@@ -112,6 +117,7 @@ func getCurrentUser() string {
 	return user.Username
 }
 
+// initConfigManager creates and initializes the configuration manager
 func initConfigManager(username string) *config.Manager {
 	configManager, err := config.NewManager(username)
 	if err != nil {
@@ -120,6 +126,7 @@ func initConfigManager(username string) *config.Manager {
 	return configManager
 }
 
+// handlePrivileges checks and handles administrative privileges
 func handlePrivileges(display *ui.Display) error {
 	isAdmin, err := checkAdminPrivileges()
 	if err != nil {
@@ -143,6 +150,7 @@ func handlePrivileges(display *ui.Display) error {
 	return nil
 }
 
+// handleWindowsPrivileges handles privilege elevation on Windows systems
 func handleWindowsPrivileges(display *ui.Display) error {
 	message := "\nRequesting administrator privileges..."
 	if lang.GetCurrentLanguage() == lang.CN {
@@ -164,6 +172,7 @@ func handleWindowsPrivileges(display *ui.Display) error {
 	return nil
 }
 
+// setupDisplay initializes the user interface
 func setupDisplay(display *ui.Display) {
 	if err := display.ClearScreen(); err != nil {
 		log.Warn("Failed to clear screen:", err)
@@ -172,6 +181,7 @@ func setupDisplay(display *ui.Display) {
 	fmt.Println()
 }
 
+// handleCursorProcesses manages running Cursor processes
 func handleCursorProcesses(display *ui.Display, processManager *process.Manager) error {
 	if os.Getenv("AUTOMATED_MODE") == "1" {
 		log.Debug("Running in automated mode, skipping Cursor process closing")
@@ -203,8 +213,8 @@ func handleCursorProcesses(display *ui.Display, processManager *process.Manager)
 	return nil
 }
 
+// readExistingConfig attempts to read the existing configuration
 func readExistingConfig(display *ui.Display, configManager *config.Manager, text lang.TextResource) *config.StorageConfig {
-	fmt.Println()
 	display.ShowProgress(text.ReadingConfig)
 	oldConfig, err := configManager.ReadConfig()
 	if err != nil {
@@ -216,6 +226,7 @@ func readExistingConfig(display *ui.Display, configManager *config.Manager, text
 	return oldConfig
 }
 
+// generateNewConfig creates a new configuration with generated IDs
 func generateNewConfig(display *ui.Display, generator *idgen.Generator, oldConfig *config.StorageConfig, text lang.TextResource) *config.StorageConfig {
 	display.ShowProgress(text.GeneratingIds)
 	newConfig := &config.StorageConfig{}
@@ -238,6 +249,7 @@ func generateNewConfig(display *ui.Display, generator *idgen.Generator, oldConfi
 		newConfig.TelemetryDevDeviceId = deviceID
 	}
 
+	// Preserve existing SQM ID if available, otherwise generate new one
 	if oldConfig != nil && oldConfig.TelemetrySqmId != "" {
 		newConfig.TelemetrySqmId = oldConfig.TelemetrySqmId
 	} else if sqmID, err := generator.GenerateSQMID(); err != nil {
@@ -251,6 +263,7 @@ func generateNewConfig(display *ui.Display, generator *idgen.Generator, oldConfi
 	return newConfig
 }
 
+// saveConfiguration persists the new configuration
 func saveConfiguration(display *ui.Display, configManager *config.Manager, newConfig *config.StorageConfig) error {
 	display.ShowProgress("Saving configuration...")
 	if err := configManager.SaveConfig(newConfig, *setReadOnly); err != nil {
@@ -263,6 +276,7 @@ func saveConfiguration(display *ui.Display, configManager *config.Manager, newCo
 	return nil
 }
 
+// showCompletionMessages displays success messages to the user
 func showCompletionMessages(display *ui.Display) {
 	display.ShowSuccess(lang.GetText().SuccessMessage, lang.GetText().RestartMessage)
 	fmt.Println()
@@ -274,17 +288,18 @@ func showCompletionMessages(display *ui.Display) {
 	display.ShowInfo(message)
 }
 
+// waitExit waits for user input before exiting
 func waitExit() {
 	fmt.Print(lang.GetText().PressEnterToExit)
 	os.Stdout.Sync()
 	bufio.NewReader(os.Stdin).ReadString('\n')
 }
 
+// checkAdminPrivileges verifies if the current process has administrative privileges
 func checkAdminPrivileges() (bool, error) {
 	switch runtime.GOOS {
 	case "windows":
-		cmd := exec.Command("net", "session")
-		return cmd.Run() == nil, nil
+		return exec.Command("net", "session").Run() == nil, nil
 
 	case "darwin", "linux":
 		currentUser, err := user.Current()
@@ -298,17 +313,17 @@ func checkAdminPrivileges() (bool, error) {
 	}
 }
 
+// selfElevate attempts to re-run the current process with elevated privileges
 func selfElevate() error {
 	os.Setenv("AUTOMATED_MODE", "1")
 
 	switch runtime.GOOS {
 	case "windows":
-		verb := "runas"
 		exe, _ := os.Executable()
 		cwd, _ := os.Getwd()
 		args := strings.Join(os.Args[1:], " ")
 
-		cmd := exec.Command("cmd", "/C", "start", verb, exe, args)
+		cmd := exec.Command("cmd", "/C", "start", "runas", exe, args)
 		cmd.Dir = cwd
 		return cmd.Run()
 

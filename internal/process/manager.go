@@ -12,9 +12,9 @@ import (
 
 // Config holds process manager configuration
 type Config struct {
-	MaxAttempts     int           // Maximum number of attempts to kill processes
-	RetryDelay      time.Duration // Delay between retry attempts
-	ProcessPatterns []string      // Process names to look for
+	MaxAttempts     int           
+	RetryDelay      time.Duration 
+	ProcessPatterns []string      
 }
 
 // DefaultConfig returns the default configuration
@@ -23,13 +23,13 @@ func DefaultConfig() *Config {
 		MaxAttempts: 3,
 		RetryDelay:  2 * time.Second,
 		ProcessPatterns: []string{
-			"Cursor.exe", // Windows executable
-			"Cursor ",    // Linux/macOS executable with space
-			"cursor ",    // Linux/macOS executable lowercase with space
-			"cursor",     // Linux/macOS executable lowercase
-			"Cursor",     // Linux/macOS executable
-			"*cursor*",   // Any process containing cursor
-			"*Cursor*",   // Any process containing Cursor
+			"Cursor.exe",
+			"Cursor ",    
+			"cursor ",    
+			"cursor",     
+			"Cursor",     
+			"*cursor*",   
+			"*Cursor*",   
 		},
 	}
 }
@@ -76,7 +76,6 @@ func (m *Manager) KillCursorProcesses() error {
 			return nil
 		}
 
-		// Try graceful shutdown first on Windows
 		if runtime.GOOS == "windows" {
 			for _, pid := range processes {
 				exec.Command("taskkill", "/PID", pid).Run()
@@ -84,7 +83,6 @@ func (m *Manager) KillCursorProcesses() error {
 			}
 		}
 
-		// Force kill remaining processes
 		remainingProcesses, _ := m.getCursorProcesses()
 		for _, pid := range remainingProcesses {
 			m.killProcess(pid)
@@ -96,15 +94,14 @@ func (m *Manager) KillCursorProcesses() error {
 			return nil
 		}
 	}
-
 	return nil
 }
 
-// getCursorProcesses returns PIDs of running Cursor processes
+// Process listing functions
 func (m *Manager) getCursorProcesses() ([]string, error) {
 	cmd := m.getProcessListCommand()
 	if cmd == nil {
-		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+		return nil, fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
 
 	output, err := cmd.Output()
@@ -115,7 +112,6 @@ func (m *Manager) getCursorProcesses() ([]string, error) {
 	return m.parseProcessList(string(output)), nil
 }
 
-// getProcessListCommand returns the appropriate command to list processes based on OS
 func (m *Manager) getProcessListCommand() *exec.Cmd {
 	switch runtime.GOOS {
 	case "windows":
@@ -129,16 +125,13 @@ func (m *Manager) getProcessListCommand() *exec.Cmd {
 	}
 }
 
-// parseProcessList extracts Cursor process PIDs from process list output
 func (m *Manager) parseProcessList(output string) []string {
 	var processes []string
 	for _, line := range strings.Split(output, "\n") {
 		lowerLine := strings.ToLower(line)
-
 		if m.isOwnProcess(lowerLine) {
 			continue
 		}
-
 		if pid := m.findCursorProcess(line, lowerLine); pid != "" {
 			processes = append(processes, pid)
 		}
@@ -146,13 +139,12 @@ func (m *Manager) parseProcessList(output string) []string {
 	return processes
 }
 
-// isOwnProcess checks if the process belongs to this application
+// Process matching functions
 func (m *Manager) isOwnProcess(line string) bool {
 	return strings.Contains(line, "cursor-id-modifier") ||
 		strings.Contains(line, "cursor-helper")
 }
 
-// findCursorProcess checks if a process line matches Cursor patterns and returns its PID
 func (m *Manager) findCursorProcess(line, lowerLine string) string {
 	for _, pattern := range m.config.ProcessPatterns {
 		if m.matchPattern(lowerLine, strings.ToLower(pattern)) {
@@ -162,7 +154,6 @@ func (m *Manager) findCursorProcess(line, lowerLine string) string {
 	return ""
 }
 
-// matchPattern checks if a line matches a pattern, supporting wildcards
 func (m *Manager) matchPattern(line, pattern string) bool {
 	switch {
 	case strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*"):
@@ -177,7 +168,7 @@ func (m *Manager) matchPattern(line, pattern string) bool {
 	}
 }
 
-// extractPID extracts process ID from a process list line based on OS format
+// Process killing functions
 func (m *Manager) extractPID(line string) string {
 	switch runtime.GOOS {
 	case "windows":
@@ -194,16 +185,14 @@ func (m *Manager) extractPID(line string) string {
 	return ""
 }
 
-// killProcess forcefully terminates a process by PID
 func (m *Manager) killProcess(pid string) error {
 	cmd := m.getKillCommand(pid)
 	if cmd == nil {
-		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
 	return cmd.Run()
 }
 
-// getKillCommand returns the appropriate command to kill a process based on OS
 func (m *Manager) getKillCommand(pid string) *exec.Cmd {
 	switch runtime.GOOS {
 	case "windows":

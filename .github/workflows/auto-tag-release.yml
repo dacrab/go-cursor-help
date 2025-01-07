@@ -1,14 +1,12 @@
 # This workflow requires Ubuntu 22.04 or 24.04
 
-name: Auto Tag & Release
+name: Auto Release & Tag
 
 on:
   push:
     branches:
       - master
       - main
-    tags:
-      - "v*"
     paths-ignore:
       - "**.md"
       - "LICENSE"
@@ -32,15 +30,13 @@ jobs:
           cancel_others: "true"
           concurrent_skipping: "same_content"
 
-  auto-tag-release:
+  create-release:
     needs: pre_job
-    if: |
-      needs.pre_job.outputs.should_skip != 'true' ||
-      startsWith(github.ref, 'refs/tags/v')
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     outputs:
-      version: ${{ steps.get_latest_tag.outputs.version }}
+      version: ${{ steps.prepare_release.outputs.version }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -72,16 +68,11 @@ jobs:
             ${{ runner.os }}-build-
             ${{ runner.os }}-
 
-      # 只在非tag推送时执行自动打tag
-      - name: Get latest tag
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        id: get_latest_tag
+      - name: Prepare Release
+        id: prepare_release
         run: |
           set -euo pipefail
-          git fetch --tags --force || {
-            echo "::error::Failed to fetch tags"
-            exit 1
-          }
+          git fetch --tags --force
           latest_tag=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
           if [ -z "$latest_tag" ]; then
             new_version="v0.1.0"
@@ -95,64 +86,40 @@ jobs:
           echo "version=$new_version" >> "$GITHUB_OUTPUT"
           echo "Generated version: $new_version"
 
-      - name: Validate version
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+      - name: Validate Version
         run: |
           set -euo pipefail
-          new_tag="${{ steps.get_latest_tag.outputs.version }}"
-          echo "Validating version: $new_tag"
-          if [[ ! $new_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid version format: $new_tag"
+          new_version="${{ steps.prepare_release.outputs.version }}"
+          echo "Validating version: $new_version"
+          if [[ ! $new_version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $new_version"
             exit 1
           fi
-          major=$(echo $new_tag | cut -d. -f1 | tr -d 'v')
-          minor=$(echo $new_tag | cut -d. -f2)
-          patch=$(echo $new_tag | cut -d. -f3)
+          major=$(echo $new_version | cut -d. -f1 | tr -d 'v')
+          minor=$(echo $new_version | cut -d. -f2)
+          patch=$(echo $new_version | cut -d. -f3)
           if [[ $major -gt 99 || $minor -gt 99 || $patch -gt 999 ]]; then
             echo "::error::Version numbers out of valid range"
             exit 1
           fi
           echo "Version validation passed"
 
-      - name: Create new tag
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          new_tag=${{ steps.get_latest_tag.outputs.version }}
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -a $new_tag -m "Release $new_tag"
-          git push origin $new_tag
-
-      # 在 Run GoReleaser 之前添加配置检查步骤
-      - name: Check GoReleaser config
-        run: |
-          if [ ! -f ".goreleaser.yml" ] && [ ! -f ".goreleaser.yaml" ]; then
-            echo "::error::GoReleaser configuration file not found"
-            exit 1
-          fi
-
-      # 添加依赖检查步骤
       - name: Check Dependencies
         run: |
           go mod verify
           go mod download
-          # 如果使用 vendor 模式，则执行以下命令
           if [ -d "vendor" ]; then
             go mod vendor
           fi
 
-      # 添加构建环境准备步骤
       - name: Prepare Build Environment
         run: |
-          echo "Building version: ${VERSION:-development}"
+          echo "Building version: ${{ steps.prepare_release.outputs.version }}"
           echo "GOOS=${GOOS:-$(go env GOOS)}" >> $GITHUB_ENV
           echo "GOARCH=${GOARCH:-$(go env GOARCH)}" >> $GITHUB_ENV
           echo "GO111MODULE=on" >> $GITHUB_ENV
 
-      # 添加清理步骤
-      - name: Cleanup workspace
+      - name: Cleanup Workspace
         run: |
           rm -rf /tmp/go/
           rm -rf .cache/
@@ -160,9 +127,7 @@ jobs:
           git clean -fdx
           git status
 
-      # 修改 GoReleaser 步骤
-      - name: Run GoReleaser
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (success() && steps.get_latest_tag.outputs.version != '') }}
+      - name: Build Release
         uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
@@ -170,79 +135,32 @@ jobs:
           args: release --clean --timeout 60m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.get_latest_tag.outputs.version }}
+          VERSION: ${{ steps.prepare_release.outputs.version }}
           CGO_ENABLED: 0
           GOPATH: /tmp/go
-          GOROOT: ${{ env.GOROOT }}
           GOCACHE: /tmp/.cache/go-build
           GOMODCACHE: /tmp/go/pkg/mod
           GORELEASER_DEBUG: 1
-          GORELEASER_CURRENT_TAG: ${{ steps.get_latest_tag.outputs.version }}
-          # 添加额外的构建信息
-          BUILD_TIME: ${{ steps.get_latest_tag.outputs.version }}
+          GORELEASER_CURRENT_TAG: ${{ steps.prepare_release.outputs.version }}
+          BUILD_TIME: ${{ steps.prepare_release.outputs.version }}
           BUILD_COMMIT: ${{ github.sha }}
 
-      # 优化 vendor 同步步骤
-      - name: Sync vendor directory
-        run: |
-          echo "Syncing vendor directory..."
-          go mod tidy
-          go mod vendor
-          go mod verify
-          # 验证 vendor 目录
-          if [ -d "vendor" ]; then
-            echo "Verifying vendor directory..."
-            go mod verify
-            # 检查是否有未跟踪的文件
-            if [ -n "$(git status --porcelain vendor/)" ]; then
-              echo "Warning: Vendor directory has uncommitted changes"
-              git status vendor/
-            fi
-          fi
-
-      # 添加错误检查步骤
-      - name: Check GoReleaser Output
-        if: failure()
-        run: |
-          echo "::group::GoReleaser Debug Info"
-          cat dist/artifacts.json || true
-          echo "::endgroup::"
-
-          echo "::group::GoReleaser Config"
-          cat .goreleaser.yml
-          echo "::endgroup::"
-
-          echo "::group::Environment Info"
-          go version
-          go env
-          echo "::endgroup::"
-
-      - name: Set Release Version
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      # 改进验证步骤
       - name: Verify Release
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (success() && steps.get_latest_tag.outputs.version != '') }}
         run: |
           echo "Verifying release artifacts..."
           if [ ! -d "dist" ]; then
             echo "::error::Release artifacts not found"
             exit 1
           fi
-          # 验证生成的二进制文件
           for file in dist/cursor-id-modifier_*; do
             if [ -f "$file" ]; then
               echo "Verifying: $file"
               if [[ "$file" == *.exe ]]; then
-                # Windows 二进制文件检查
                 if ! [ -x "$file" ]; then
                   echo "::error::$file is not executable"
                   exit 1
                 fi
               else
-                # Unix 二进制文件检查
                 if ! [ -x "$file" ]; then
                   echo "::error::$file is not executable"
                   exit 1
@@ -251,22 +169,24 @@ jobs:
             fi
           done
 
-      - name: Notify on failure
-        if: failure()
+      - name: Create Tag
+        if: success()
         run: |
-          echo "::error::Release process failed"
+          new_version=${{ steps.prepare_release.outputs.version }}
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a $new_version -m "Release $new_version"
+          git push origin $new_version
 
-      # 修改构建摘要步骤
-      - name: Build Summary
-        if: always()
-        run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- Go Version: $(go version)" >> $GITHUB_STEP_SUMMARY
-          echo "- Release Version: ${VERSION:-N/A}" >> $GITHUB_STEP_SUMMARY
-          echo "- GPG Signing: Disabled" >> $GITHUB_STEP_SUMMARY
-          echo "- Build Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-
-          if [ -d "dist" ]; then
-            echo "### Generated Artifacts" >> $GITHUB_STEP_SUMMARY
-            ls -lh dist/ | awk '{print "- "$9" ("$5")"}' >> $GITHUB_STEP_SUMMARY
-          fi
+      - name: Create GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.prepare_release.outputs.version }}
+          name: Release ${{ steps.prepare_release.outputs.version }}
+          files: dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

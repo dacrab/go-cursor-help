@@ -11,10 +11,8 @@ import (
 type Language string
 
 const (
-	// CN represents Chinese language
-	CN Language = "cn"
-	// EN represents English language
-	EN Language = "en"
+	CN Language = "cn" // Chinese language
+	EN Language = "en" // English language
 )
 
 // TextResource contains all translatable text resources
@@ -23,7 +21,7 @@ type TextResource struct {
 	SuccessMessage string
 	RestartMessage string
 
-	// Progress messages
+	// Progress messages 
 	ReadingConfig     string
 	GeneratingIds     string
 	CheckingProcesses string
@@ -46,6 +44,7 @@ type TextResource struct {
 	ConfigLocation string
 }
 
+// Language detection and management
 var (
 	currentLanguage     Language
 	currentLanguageOnce sync.Once
@@ -75,19 +74,17 @@ func GetText() TextResource {
 	return texts[GetCurrentLanguage()]
 }
 
-// detectLanguage detects the system language
+// Language detection helpers
 func detectLanguage() Language {
-	// Check environment variables first
 	if isChineseEnvVar() {
 		return CN
 	}
 
-	// Then check OS-specific locale
-	if isWindows() {
-		if isWindowsChineseLocale() {
-			return CN
-		}
-	} else if isUnixChineseLocale() {
+	if isWindows() && isWindowsChineseLocale() {
+		return CN
+	}
+
+	if !isWindows() && isUnixChineseLocale() {
 		return CN
 	}
 
@@ -95,8 +92,9 @@ func detectLanguage() Language {
 }
 
 func isChineseEnvVar() bool {
-	for _, envVar := range []string{"LANG", "LANGUAGE", "LC_ALL"} {
-		if lang := os.Getenv(envVar); lang != "" && strings.Contains(strings.ToLower(lang), "zh") {
+	envVars := []string{"LANG", "LANGUAGE", "LC_ALL"}
+	for _, env := range envVars {
+		if lang := os.Getenv(env); lang != "" && strings.Contains(strings.ToLower(lang), "zh") {
 			return true
 		}
 	}
@@ -109,26 +107,29 @@ func isWindows() bool {
 
 func isWindowsChineseLocale() bool {
 	// Check Windows UI culture
-	cmd := exec.Command("powershell", "-Command",
-		"[System.Globalization.CultureInfo]::CurrentUICulture.Name")
-	output, err := cmd.Output()
-	if err == nil && strings.HasPrefix(strings.ToLower(strings.TrimSpace(string(output))), "zh") {
-		return true
+	cmd := exec.Command("powershell", "-Command", "[System.Globalization.CultureInfo]::CurrentUICulture.Name")
+	if output, err := cmd.Output(); err == nil {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(string(output))), "zh") {
+			return true
+		}
 	}
 
 	// Check Windows locale
 	cmd = exec.Command("wmic", "os", "get", "locale")
-	output, err = cmd.Output()
-	return err == nil && strings.Contains(string(output), "2052")
+	if output, err := cmd.Output(); err == nil {
+		return strings.Contains(string(output), "2052")
+	}
+	return false
 }
 
 func isUnixChineseLocale() bool {
-	cmd := exec.Command("locale")
-	output, err := cmd.Output()
-	return err == nil && strings.Contains(strings.ToLower(string(output)), "zh_cn")
+	if output, err := exec.Command("locale").Output(); err == nil {
+		return strings.Contains(strings.ToLower(string(output)), "zh_cn")
+	}
+	return false
 }
 
-// texts contains all translations
+// Translation resources
 var texts = map[Language]TextResource{
 	CN: {
 		// Success messages
@@ -149,7 +150,7 @@ var texts = map[Language]TextResource{
 
 		// Instructions
 		RunAsAdmin:         "请右键点击程序，选择「以管理员身份运行」",
-		RunWithSudo:        "请使用 sudo 命令运行此程序",
+		RunWithSudo:        "请使用 sudo 命令运行此程序", 
 		SudoExample:        "示例: sudo %s",
 		PressEnterToExit:   "\n按回车键退出程序...",
 		SetReadOnlyMessage: "设置 storage.json 为只读模式, 这将导致 workspace 记录信息丢失等问题",

@@ -7,6 +7,12 @@ import (
 	"sync"
 )
 
+// Constants for ID generation
+const (
+	machineIDPrefix = "auth0|user_"
+	uuidFormat      = "%s-%s-%s-%s-%s"
+)
+
 // Generator handles secure ID generation for machines and devices
 type Generator struct {
 	bufferPool sync.Pool
@@ -23,12 +29,6 @@ func NewGenerator() *Generator {
 	}
 }
 
-// Constants for ID generation
-const (
-	machineIDPrefix = "auth0|user_"
-	uuidFormat      = "%s-%s-%s-%s-%s"
-)
-
 // generateRandomHex generates a random hex string of specified length
 func (g *Generator) generateRandomHex(length int) (string, error) {
 	buffer := g.bufferPool.Get().([]byte)
@@ -42,17 +42,16 @@ func (g *Generator) generateRandomHex(length int) (string, error) {
 
 // GenerateMachineID generates a new machine ID with auth0|user_ prefix
 func (g *Generator) GenerateMachineID() (string, error) {
-	randomPart, err := g.generateRandomHex(32) // 生成64字符的十六进制
+	randomPart, err := g.generateRandomHex(32)
 	if err != nil {
 		return "", err
 	}
-
 	return fmt.Sprintf("%x%s", []byte(machineIDPrefix), randomPart), nil
 }
 
 // GenerateMacMachineID generates a new 64-byte MAC machine ID
 func (g *Generator) GenerateMacMachineID() (string, error) {
-	return g.generateRandomHex(32) // 生成64字符的十六进制
+	return g.generateRandomHex(32)
 }
 
 // GenerateDeviceID generates a new device ID in UUID format
@@ -61,8 +60,7 @@ func (g *Generator) GenerateDeviceID() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(uuidFormat,
-		id[0:8], id[8:12], id[12:16], id[16:20], id[20:32]), nil
+	return fmt.Sprintf(uuidFormat, id[0:8], id[8:12], id[12:16], id[16:20], id[20:32]), nil
 }
 
 // GenerateSQMID generates a new SQM ID in UUID format (with braces)
