@@ -170,6 +170,9 @@ catch {
 }
 finally {
     Cleanup
-    Write-Host "`nPress Enter to exit..." -ForegroundColor Green
-    $null = Read-Host
+    # Only show exit prompt if the program didn't run successfully
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`nPress Enter to exit..." -ForegroundColor Yellow
+        $null = Read-Host
+    }
 }
