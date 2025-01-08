@@ -1,12 +1,8 @@
-# This workflow requires Ubuntu 22.04 or 24.04
-
 name: Auto Release & Tag
 
 on:
   push:
-    branches:
-      - master
-      - main
+    branches: [master, main]
     paths-ignore:
       - "**.md"
       - "LICENSE"
@@ -56,7 +52,7 @@ jobs:
           check-latest: true
           cache: true
 
-      - name: Cache
+      - name: Cache Dependencies
         uses: actions/cache@v3
         with:
           path: |
@@ -68,27 +64,23 @@ jobs:
             ${{ runner.os }}-build-
             ${{ runner.os }}-
 
-      - name: Prepare Release
+      - name: Prepare Release Version
         id: prepare_release
         run: |
-          set -euo pipefail
           git fetch --tags --force
           latest_tag=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
-          if [ -z "$latest_tag" ]; then
-            new_version="v0.1.0"
-          else
+          new_version="v0.1.0"
+          if [ -n "$latest_tag" ]; then
             major=$(echo $latest_tag | cut -d. -f1)
             minor=$(echo $latest_tag | cut -d. -f2)
             patch=$(echo $latest_tag | cut -d. -f3)
-            new_patch=$((patch + 1))
-            new_version="$major.$minor.$new_patch"
+            new_version="$major.$minor.$((patch + 1))"
           fi
           echo "version=$new_version" >> "$GITHUB_OUTPUT"
           echo "Generated version: $new_version"
 
       - name: Validate Version
         run: |
-          set -euo pipefail
           new_version="${{ steps.prepare_release.outputs.version }}"
           echo "Validating version: $new_version"
           if [[ ! $new_version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -104,28 +96,16 @@ jobs:
           fi
           echo "Version validation passed"
 
-      - name: Check Dependencies
+      - name: Setup Build Environment
         run: |
           go mod verify
           go mod download
-          if [ -d "vendor" ]; then
-            go mod vendor
-          fi
-
-      - name: Prepare Build Environment
-        run: |
-          echo "Building version: ${{ steps.prepare_release.outputs.version }}"
+          [ -d "vendor" ] && go mod vendor
           echo "GOOS=${GOOS:-$(go env GOOS)}" >> $GITHUB_ENV
           echo "GOARCH=${GOARCH:-$(go env GOARCH)}" >> $GITHUB_ENV
           echo "GO111MODULE=on" >> $GITHUB_ENV
-
-      - name: Cleanup Workspace
-        run: |
-          rm -rf /tmp/go/
-          rm -rf .cache/
-          rm -rf dist/
+          rm -rf /tmp/go/ .cache/ dist/
           git clean -fdx
-          git status
 
       - name: Build Release
         uses: goreleaser/goreleaser-action@v3
@@ -145,38 +125,26 @@ jobs:
           BUILD_TIME: ${{ steps.prepare_release.outputs.version }}
           BUILD_COMMIT: ${{ github.sha }}
 
-      - name: Verify Release
+      - name: Verify Release Artifacts
         run: |
-          echo "Verifying release artifacts..."
-          if [ ! -d "dist" ]; then
-            echo "::error::Release artifacts not found"
-            exit 1
-          fi
+          [ ! -d "dist" ] && echo "::error::Release artifacts not found" && exit 1
           for file in dist/cursor-id-modifier_*; do
             if [ -f "$file" ]; then
               echo "Verifying: $file"
-              if [[ "$file" == *.exe ]]; then
-                if ! [ -x "$file" ]; then
-                  echo "::error::$file is not executable"
-                  exit 1
-                fi
-              else
-                if ! [ -x "$file" ]; then
-                  echo "::error::$file is not executable"
-                  exit 1
-                fi
+              if ! [ -x "$file" ]; then
+                echo "::error::$file is not executable"
+                exit 1
               fi
             fi
           done
 
-      - name: Create Tag
+      - name: Create Git Tag
         if: success()
         run: |
-          new_version=${{ steps.prepare_release.outputs.version }}
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -a $new_version -m "Release $new_version"
-          git push origin $new_version
+          git tag -a ${{ steps.prepare_release.outputs.version }} -m "Release ${{ steps.prepare_release.outputs.version }}"
+          git push origin ${{ steps.prepare_release.outputs.version }}
 
       - name: Create GitHub Release
         if: success()

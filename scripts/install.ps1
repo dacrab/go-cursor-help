@@ -3,16 +3,27 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-NOT $isAdmin) {
     try {
         Write-Host "`nRequesting administrator privileges..." -ForegroundColor Cyan
+        
+        # Get PowerShell path
+        $pwshPath = if (Get-Command "pwsh" -ErrorAction SilentlyContinue) {
+            (Get-Command "pwsh").Source
+        } else {
+            "powershell.exe"
+        }
+        
+        # Get script path
         $scriptPath = if ($MyInvocation.MyCommand.Path) {
             $MyInvocation.MyCommand.Path
         } else {
             $tmpScript = Join-Path $env:TEMP "cursor_installer_$([Guid]::NewGuid()).ps1"
             $webclient = New-Object System.Net.WebClient
-            $webclient.Headers.Add("User-Agent", "PowerShell")
-            $webclient.DownloadFile('https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/install.ps1', $tmpScript)
+            $repoUrl = $env:GITHUB_REPOSITORY ?? "yuaotian/go-cursor-help"
+            $webclient.DownloadFile("https://raw.githubusercontent.com/$repoUrl/master/scripts/install.ps1", $tmpScript)
             $tmpScript
         }
-        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs -Wait
+        
+        Start-Process $pwshPath -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs -Wait
+        
         if (Test-Path $tmpScript) {
             Remove-Item -Path $tmpScript -Force
         }
@@ -20,31 +31,27 @@ if (-NOT $isAdmin) {
     }
     catch {
         Write-Host "`nError: Administrator privileges required" -ForegroundColor Red
-        Write-Host "Please run this script from an Administrator PowerShell window" -ForegroundColor Yellow
-        Write-Host "`nTo do this:" -ForegroundColor Cyan
-        Write-Host "1. Press Win + X" -ForegroundColor White
+        Write-Host "Please run as Administrator:" -ForegroundColor Yellow
+        Write-Host "1. Press Win + X" -ForegroundColor White 
         Write-Host "2. Click 'Windows Terminal (Admin)' or 'PowerShell (Admin)'" -ForegroundColor White
         Write-Host "3. Run the installation command again" -ForegroundColor White
-        Write-Host "`nPress Enter to exit..."
-        $null = Read-Host
+        Read-Host "`nPress Enter to exit"
         exit 1
     }
 }
 
-# Set security protocol
+# Initialize
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-# Setup temp directory and cleanup
 $TmpDir = Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Path $TmpDir | Out-Null
 
+# Helper Functions
 function Cleanup {
     if (Test-Path $TmpDir) {
         Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
     }
 }
 
-# Helper functions
 function Get-SystemArch {
     if ([Environment]::Is64BitOperatingSystem) { "x86_64" } else { "i386" }
 }
@@ -64,7 +71,7 @@ function Get-FileWithProgress {
     }
 }
 
-function Fix-StoragePermissions {
+function Set-StoragePermissions {
     $storageJsonPath = "$env:APPDATA\Cursor\User\globalStorage\storage.json"
     $storageDir = Split-Path $storageJsonPath -Parent
     
@@ -73,64 +80,57 @@ function Fix-StoragePermissions {
     }
     
     $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $fileSystemRights = [System.Security.AccessControl.FileSystemRights]::FullControl
+    $rights = [System.Security.AccessControl.FileSystemRights]::FullControl
     $type = [System.Security.AccessControl.AccessControlType]::Allow
     
     if (Test-Path $storageJsonPath) {
         $acl = Get-Acl $storageJsonPath
-        $fileSystemAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, $fileSystemRights, $type)
-        $acl.AddAccessRule($fileSystemAccessRule)
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, $rights, $type)
+        $acl.AddAccessRule($rule)
         Set-Acl -Path $storageJsonPath -AclObject $acl -ErrorAction SilentlyContinue
     }
     
     $acl = Get-Acl $storageDir
-    $inheritanceFlags = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
-    $propagationFlags = [System.Security.AccessControl.PropagationFlags]::None
-    $dirSystemAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, $fileSystemRights, $inheritanceFlags, $propagationFlags, $type)
-    $acl.AddAccessRule($dirSystemAccessRule)
+    $inherit = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, $rights, $inherit, [System.Security.AccessControl.PropagationFlags]::None, $type)
+    $acl.AddAccessRule($rule)
     Set-Acl -Path $storageDir -AclObject $acl -ErrorAction SilentlyContinue
 }
 
 function Install-CursorModifier {
     Write-Host "Starting installation..." -ForegroundColor Cyan
     
-    # Initial setup
-    Fix-StoragePermissions
+    # Setup
+    Set-StoragePermissions
     Get-Process | Where-Object { $_.ProcessName -like "*cursor*" } | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
     
     $arch = Get-SystemArch
-    Write-Host "Detected architecture: $arch" -ForegroundColor Green
-    
     $InstallDir = "$env:ProgramFiles\CursorModifier"
-    if (!(Test-Path $InstallDir)) {
-        New-Item -ItemType Directory -Path $InstallDir | Out-Null
-    }
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     
-    # Get latest release
     try {
-        $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
-        $version = $latestRelease.tag_name.TrimStart('v')
-        Write-Host "Found latest release: v$version" -ForegroundColor Cyan
+        # Get repository URL
+        $repoUrl = $env:GITHUB_REPOSITORY ?? "yuaotian/go-cursor-help"
         
-        $possibleNames = @(
-            "cursor-id-modifier_${version}_windows_x86_64.exe",
-            "cursor-id-modifier_${version}_windows_$($arch).exe"
-        )
+        # Get latest release
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repoUrl/releases/latest"
+        $version = $release.tag_name.TrimStart('v')
+        Write-Host "Latest version: v$version" -ForegroundColor Cyan
         
-        $asset = $null
-        foreach ($name in $possibleNames) {
-            $asset = $latestRelease.assets | Where-Object { $_.name -eq $name }
-            if ($asset) { break }
-        }
+        # Find correct asset
+        $asset = $release.assets | Where-Object { 
+            $_.name -in @(
+                "cursor-id-modifier_${version}_windows_x86_64.exe",
+                "cursor-id-modifier_${version}_windows_$($arch).exe"
+            )
+        } | Select-Object -First 1
         
         if (!$asset) {
-            Write-Host "`nAvailable assets:" -ForegroundColor Yellow
-            $latestRelease.assets | ForEach-Object { Write-Host "- $($_.name)" }
-            throw "Could not find appropriate Windows binary for $arch architecture"
+            throw "No compatible binary found for $arch architecture"
         }
         
-        # Download and install
+        # Install
         $binaryPath = Join-Path $TmpDir "cursor-id-modifier.exe"
         if (!(Get-FileWithProgress -Url $asset.browser_download_url -OutputFile $binaryPath)) {
             throw "Download failed"
@@ -138,12 +138,13 @@ function Install-CursorModifier {
         
         Copy-Item -Path $binaryPath -Destination "$InstallDir\cursor-id-modifier.exe" -Force
         
+        # Update PATH
         $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
         if ($currentPath -notlike "*$InstallDir*") {
             [Environment]::SetEnvironmentVariable("Path", "$currentPath;$InstallDir", "Machine")
         }
         
-        Write-Host "Installation completed successfully!" -ForegroundColor Green
+        Write-Host "Installation successful!" -ForegroundColor Green
         Write-Host "Running cursor-id-modifier..." -ForegroundColor Cyan
         
         & "$InstallDir\cursor-id-modifier.exe"
@@ -164,15 +165,12 @@ try {
 catch {
     Write-Host "Installation failed: $_" -ForegroundColor Red
     Cleanup
-    Write-Host "`nPress Enter to exit..."
-    $null = Read-Host
+    Read-Host "`nPress Enter to exit"
     exit 1
 }
 finally {
     Cleanup
-    # Only show exit prompt if the program didn't run successfully
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "`nPress Enter to exit..." -ForegroundColor Yellow
-        $null = Read-Host
+        Read-Host "`nPress Enter to exit"
     }
 }

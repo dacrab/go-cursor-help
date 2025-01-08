@@ -13,14 +13,8 @@ builds:
     env:
       - CGO_ENABLED=0
       - GO111MODULE=on
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-      - "386"
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64, "386"]
     ignore:
       - goos: darwin
         goarch: "386"
@@ -30,25 +24,16 @@ builds:
       - -X 'main.commit={{.ShortCommit}}'
       - -X 'main.date={{.CommitDate}}'
       - -X 'main.builtBy=goreleaser'
-    flags:
-      - -trimpath
+    flags: [-trimpath]
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
   - id: binary
     format: binary
-    name_template: >-
-      {{- .ProjectName }}_
-      {{- .Version }}_
-      {{- .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-    builds:
-      - cursor-id-modifier
+    name_template: "{{- .ProjectName }}_{{- .Version }}_{{- .Os }}_{{- if eq .Arch \"amd64\" }}x86_64{{- else if eq .Arch \"386\" }}i386{{- else }}{{ .Arch }}{{ end }}"
+    builds: [cursor-id-modifier]
     allow_different_binary_count: true
-    files:
-      - none*
+    files: [none*]
 
 checksum:
   name_template: 'checksums.txt'
@@ -59,7 +44,7 @@ release:
   prerelease: false
   mode: replace
   header: |
-    ## Cursor ID Modifier {{.Tag}} ({{.Date}})
+    ## {{.ProjectName}} {{.Tag}} ({{.Date}})
     
     This release includes new features, improvements, and bug fixes.
     See [CHANGELOG.md](CHANGELOG.md) for details.
@@ -68,12 +53,12 @@ release:
     
     **Windows**:
     ```powershell
-    irm https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/install.ps1 | iex
+    irm https://raw.githubusercontent.com/{{.Env.GITHUB_REPOSITORY}}/master/scripts/install.ps1 | iex
     ```
     
     **Linux/macOS**:
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/install.sh | sudo bash
+    curl -fsSL https://raw.githubusercontent.com/{{.Env.GITHUB_REPOSITORY}}/master/scripts/install.sh | sudo bash
     ```
   footer: |
     ### SHA-256 Checksums
@@ -81,7 +66,7 @@ release:
     {{ .Checksums }}
     ```
     
-    **Full Changelog**: https://github.com/yuaotian/go-cursor-help/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/{{.Env.GITHUB_REPOSITORY}}/compare/{{ .PreviousTag }}...{{ .Tag }}
   extra_files:
     - glob: 'LICENSE*'
     - glob: 'README*'

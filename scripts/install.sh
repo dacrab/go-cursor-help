@@ -9,6 +9,9 @@ BLUE='\033[0;36m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
 
+# Repository settings
+REPO_URL=${GITHUB_REPOSITORY:-"yuaotian/go-cursor-help"}
+
 # Temporary directory for downloads
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -84,7 +87,7 @@ main() {
     
     # Get latest release info
     echo -e "${BLUE}Fetching latest release information...${NC}"
-    LATEST_URL="https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
+    LATEST_URL="https://api.github.com/repos/${REPO_URL}/releases/latest"
     
     # Get latest version and remove 'v' prefix
     VERSION=$(curl -s "$LATEST_URL" | grep "tag_name" | cut -d'"' -f4 | sed 's/^v//')
