@@ -173,7 +173,6 @@ irm https://aizaozao.com/accelerate.php/https://raw.githubusercontent.com/yuaoti
 - `telemetry.machineId`
 - `telemetry.macMachineId`
 - `telemetry.devDeviceId`
-- `telemetry.sqmId`
 </details>
 
 <details>

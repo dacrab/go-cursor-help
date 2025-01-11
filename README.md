@@ -178,7 +178,6 @@ The tool generates new unique identifiers for:
 - `telemetry.machineId`
 - `telemetry.macMachineId`
 - `telemetry.devDeviceId`
-- `telemetry.sqmId`
 </details>
 
 <details>
