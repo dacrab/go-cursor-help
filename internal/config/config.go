@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -61,8 +62,14 @@ func (m *Manager) SaveConfig(config *StorageConfig, readOnly bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Create directory with full permissions
 	if err := os.MkdirAll(filepath.Dir(m.configPath), 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Ensure we have write permissions
+	if err := m.ensureWritePermissions(); err != nil {
+		return fmt.Errorf("failed to set write permissions: %w", err)
 	}
 
 	configMap := map[string]interface{}{
@@ -77,14 +84,54 @@ func (m *Manager) SaveConfig(config *StorageConfig, readOnly bool) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	fileMode := os.FileMode(0666)
-	if readOnly {
-		fileMode = 0444
-	}
-
-	if err := os.WriteFile(m.configPath, content, fileMode); err != nil {
+	// Write with full permissions first
+	if err := os.WriteFile(m.configPath, content, 0666); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	// Set read-only mode after writing if requested
+	if readOnly {
+		if err := m.setReadOnlyMode(); err != nil {
+			return fmt.Errorf("failed to set read-only mode: %w", err)
+		}
+	}
+
 	return nil
+}
+
+// ensureWritePermissions ensures the file is writable
+func (m *Manager) ensureWritePermissions() error {
+	if _, err := os.Stat(m.configPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil // File doesn't exist yet, no need to modify permissions
+		}
+		return err
+	}
+
+	if platform.IsWindows() {
+		// Use attrib to remove read-only attribute on Windows
+		cmd := exec.Command("attrib", "-R", m.configPath)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to remove read-only attribute: %w", err)
+		}
+		return nil
+	}
+
+	// Unix systems
+	return os.Chmod(m.configPath, 0666)
+}
+
+// setReadOnlyMode sets the file to read-only
+func (m *Manager) setReadOnlyMode() error {
+	if platform.IsWindows() {
+		// Use attrib to set read-only attribute on Windows
+		cmd := exec.Command("attrib", "+R", m.configPath)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to set read-only attribute: %w", err)
+		}
+		return nil
+	}
+
+	// Unix systems
+	return os.Chmod(m.configPath, 0444)
 }

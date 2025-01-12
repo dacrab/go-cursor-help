@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/yuaotian/go-cursor-help/internal/config"
@@ -248,8 +249,27 @@ func selfElevate() error {
 	if platform.IsWindows() {
 		cwd, _ := os.Getwd()
 		args := strings.Join(os.Args[1:], " ")
-		cmd := exec.Command("cmd", "/C", "start", "runas", exe, args)
+		// Create a batch file to run the elevated command and pause
+		batchFile := filepath.Join(os.TempDir(), "cursor_elevate.bat")
+		batchContent := fmt.Sprintf(`@echo off
+echo Elevating privileges...
+powershell -Command "Start-Process '%s' -ArgumentList '%s' -Verb RunAs -Wait"
+if %%ERRORLEVEL%% neq 0 (
+    echo Failed to elevate privileges
+    pause
+    exit /b 1
+)
+`, exe, args)
+
+		if err := os.WriteFile(batchFile, []byte(batchContent), 0700); err != nil {
+			return fmt.Errorf("failed to create batch file: %w", err)
+		}
+		defer os.Remove(batchFile)
+
+		cmd := exec.Command("cmd", "/C", batchFile)
 		cmd.Dir = cwd
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	}
 
