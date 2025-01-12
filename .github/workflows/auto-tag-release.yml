@@ -60,6 +60,11 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Install AppImage dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
       - name: Cache Go modules
         uses: actions/cache@v3
         with:
@@ -104,9 +109,6 @@ jobs:
         run: |
           go mod tidy
           go mod download
-          if [ -d "vendor" ]; then
-            go mod vendor
-          fi
 
       - name: Run GoReleaser
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (success() && steps.get_latest_tag.outputs.version != '') }}

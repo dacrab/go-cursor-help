@@ -53,7 +53,12 @@ mkdir -p "$INSTALL_DIR" || handle_error "Failed to create installation directory
 print_msg "$BLUE" "Fetching latest release..."
 LATEST_URL="https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
 VERSION=$(curl -s "$LATEST_URL" | grep "tag_name" | cut -d'"' -f4 | sed 's/^v//')
-BINARY_NAME="cursor-id-modifier_${VERSION}_${OS}_${ARCH}"
+
+case "$OS" in
+    linux)  BINARY_NAME="go-cursor-help_linux";;
+    darwin) BINARY_NAME="go-cursor-help_macos";;
+esac
+
 DOWNLOAD_URL=$(curl -s "$LATEST_URL" | grep -o "\"browser_download_url\": \"[^\"]*${BINARY_NAME}[^\"]*\"" | cut -d'"' -f4)
 
 [ -z "$DOWNLOAD_URL" ] && handle_error "Binary not found for $OS $ARCH"

@@ -56,23 +56,19 @@ If the above solutions don't work, try:
 <td>
 
 **Windows** ✅
-- x64 (64-bit)
-- x86 (32-bit)
+- Universal Binary
 
 </td>
 <td>
 
 **macOS** ✅
-- Intel (x64)
-- Apple Silicon (M1/M2)
+- Universal Binary
 
 </td>
 <td>
 
 **Linux** ✅
-- x64 (64-bit)
-- x86 (32-bit)
-- ARM64
+- Universal Binary
 
 </td>
 </tr>
@@ -138,25 +134,11 @@ That's it! The script will:
 > Download the appropriate file for your system from [releases](https://github.com/yuaotian/go-cursor-help/releases/latest)
 
 <details>
-<summary>Windows Packages</summary>
+<summary>Download Links</summary>
 
-- 64-bit: `cursor-id-modifier_windows_x64.exe`
-- 32-bit: `cursor-id-modifier_windows_x86.exe`
-</details>
-
-<details>
-<summary>macOS Packages</summary>
-
-- Intel: `cursor-id-modifier_darwin_x64_intel`
-- M1/M2: `cursor-id-modifier_darwin_arm64_apple_silicon`
-</details>
-
-<details>
-<summary>Linux Packages</summary>
-
-- 64-bit: `cursor-id-modifier_linux_x64`
-- 32-bit: `cursor-id-modifier_linux_x86`
-- ARM64: `cursor-id-modifier_linux_arm64`
+- Windows: `go-cursor-help_windows`
+- macOS: `go-cursor-help_macos`
+- Linux: `go-cursor-help_linux`
 </details>
 
 ### 🔧 Technical Details

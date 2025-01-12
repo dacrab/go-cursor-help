@@ -116,7 +116,6 @@ Rules:
 - Review code before merging
 - Test across platforms
 - Update documentation as needed
-- Maintain changelog
 
 ## Security
 - Handle user input safely

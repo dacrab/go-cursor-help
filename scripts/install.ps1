@@ -53,7 +53,7 @@ try {
     # Get latest release
     $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
     $version = $latestRelease.tag_name.TrimStart('v')
-    $asset = $latestRelease.assets | Where-Object { $_.name -eq "cursor-id-modifier_${version}_windows_x86_64.exe" } | Select-Object -First 1
+    $asset = $latestRelease.assets | Where-Object { $_.name -eq "go-cursor-help_windows" } | Select-Object -First 1
     
     if (-not $asset) {
         throw "No compatible binary found for Windows x64"

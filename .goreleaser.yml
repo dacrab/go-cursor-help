@@ -3,7 +3,6 @@ version: 2
 before:
   hooks:
     - go mod tidy
-    - go mod vendor
     - go mod verify
 
 builds:
@@ -20,73 +19,84 @@ builds:
     goarch:
       - amd64
       - arm64
-      - "386"
     ignore:
-      - goos: darwin
-        goarch: "386"
+      - goos: linux
+        goarch: arm64
+      - goos: windows
+        goarch: arm64
     ldflags:
       - -s -w
       - -X 'main.version={{.Version}}'
-      - -X 'main.commit={{.ShortCommit}}'
-      - -X 'main.date={{.CommitDate}}'
-      - -X 'main.builtBy=goreleaser'
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
-  - id: binary
+  - id: windows
+    name_template: "go-cursor-help_windows"
     format: binary
-    name_template: >-
-      {{- .ProjectName }}_
-      {{- .Version }}_
-      {{- .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
     builds:
       - cursor-id-modifier
-    allow_different_binary_count: true
+    wrap_in_directory: false
     files:
       - none*
+    allow_different_binary_count: true
+    replacements:
+      windows: Windows
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: binary
+
+  - id: macos
+    name_template: "go-cursor-help_macos"
+    format: binary
+    builds:
+      - cursor-id-modifier
+    wrap_in_directory: false
+    files:
+      - none*
+    allow_different_binary_count: true
+    replacements:
+      darwin: macOS
+    format_overrides:
+      - goos: darwin
+        format: binary
+
+  - id: linux
+    name_template: "go-cursor-help_linux"
+    format: binary
+    builds:
+      - cursor-id-modifier
+    wrap_in_directory: false
+    files:
+      - none*
+    allow_different_binary_count: true
+    replacements:
+      linux: Linux
+      amd64: x86_64
+    format_overrides:
+      - goos: linux
+        format: binary
+
+universal_binaries:
+  - replace: true
+    name_template: "{{ .ProjectName }}"
+    ids:
+      - cursor-id-modifier
 
 checksum:
   name_template: 'checksums.txt'
   algorithm: sha256
 
 release:
-  draft: true
-  prerelease: auto
+  draft: false
+  prerelease: false
   mode: replace
   header: |
     ## Release {{.Tag}} ({{.Date}})
-    
-    See [CHANGELOG.md](CHANGELOG.md) for details.
-  footer: |
-    **Full Changelog**: https://github.com/owner/repo/compare/{{ .PreviousTag }}...{{ .Tag }}
   extra_files:
     - glob: 'LICENSE*'
     - glob: 'README*'
-    - glob: 'CHANGELOG*'
-
-changelog:
-  sort: asc
-  use: github
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
-      - '^ci:'
-      - Merge pull request
-      - Merge branch
-  groups:
-    - title: Features
-      regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 0
-    - title: 'Bug fixes'
-      regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 1
-    - title: Others
-      order: 999
 
 project_name: cursor-id-modifier
