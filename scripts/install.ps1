@@ -1,3 +1,7 @@
+# Set execution policy for current process
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+
 # Check for admin rights and elevate if needed
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 if (-NOT $isAdmin) {
@@ -54,7 +58,7 @@ try {
     $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
     $version = $latestRelease.tag_name.TrimStart('v')
     $binaryPrefix = "cursor-id-modifier_Windows_x86_64"
-    $binaryName = "${binaryPrefix}_${version}"
+    $binaryName = "${binaryPrefix}_${version}.zip"
     $asset = $latestRelease.assets | Where-Object { $_.name -eq $binaryName } | Select-Object -First 1
     
     if (-not $asset) {
@@ -62,10 +66,14 @@ try {
     }
     
     # Download and install
-    $binaryPath = Join-Path $TmpDir "cursor-id-modifier.exe"
+    $zipPath = Join-Path $TmpDir "cursor-id-modifier.zip"
     $webClient = New-Object System.Net.WebClient
     $webClient.Headers.Add("User-Agent", "PowerShell Script")
-    $webClient.DownloadFile($asset.browser_download_url, $binaryPath)
+    $webClient.DownloadFile($asset.browser_download_url, $zipPath)
+    
+    # Extract zip
+    Expand-Archive -Path $zipPath -DestinationPath $TmpDir -Force
+    $binaryPath = Join-Path $TmpDir "cursor-id-modifier.exe"
     
     Copy-Item -Path $binaryPath -Destination "$InstallDir\cursor-id-modifier.exe" -Force
     

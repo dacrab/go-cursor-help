@@ -32,23 +32,7 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
-  - id: windows
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}_
-      {{- .Version }}
-    format: binary
-    builds:
-      - cursor-id-modifier
-    files:
-      - none*
-    allow_different_binary_count: true
-    format_overrides:
-      - goos: windows
-        format: binary
-
-  - id: macos
+  - id: binary-unix
     name_template: >-
       {{ .ProjectName }}_
       {{- if eq .Os "darwin" }}macOS{{ else }}{{ title .Os }}{{ end }}_
@@ -61,28 +45,12 @@ archives:
       - none*
     allow_different_binary_count: true
     format_overrides:
-      - goos: darwin
-        format: binary
-
-  - id: linux
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}_
-      {{- .Version }}
-    format: binary
-    builds:
-      - cursor-id-modifier
-    files:
-      - none*
-    allow_different_binary_count: true
-    format_overrides:
-      - goos: linux
-        format: binary
+      - goos: windows
+        format: zip
 
 universal_binaries:
   - replace: true
-    name_template: "{{ .ProjectName }}_{{ .Version }}"
+    name_template: "{{ .ProjectName }}_macOS_universal_{{ .Version }}"
     ids:
       - cursor-id-modifier
 
@@ -94,10 +62,37 @@ release:
   draft: false
   prerelease: false
   mode: replace
+  name_template: "Release {{.Tag}}"
   header: |
     ## Release {{.Tag}} ({{.Date}})
+    
+    This is the {{.Tag}} release of cursor-id-modifier.
+
+    ### Quick Installation
+
+    #### Unix/macOS
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/install.sh | sudo bash
+    ```
+
+    #### Windows (PowerShell)
+    ```powershell
+    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/yuaotian/go-cursor-help/master/scripts/install.ps1'))
+    ```
   extra_files:
     - glob: 'LICENSE*'
     - glob: 'README*'
+  replace_existing_draft: true
+  skip_upload: false
 
 project_name: cursor-id-modifier
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch

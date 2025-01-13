@@ -39,11 +39,11 @@ case "$OS" in
         case "$(uname -m)" in
             x86_64)         
                 ARCH="x86_64"
-                BINARY_PREFIX="cursor-id-modifier_macOS_x86_64"
+                BINARY_PREFIX="cursor-id-modifier_macOS_universal"
                 ;;
             aarch64|arm64)  
                 ARCH="arm64"
-                BINARY_PREFIX="cursor-id-modifier_macOS_arm64"
+                BINARY_PREFIX="cursor-id-modifier_macOS_universal"
                 ;;
             *)             handle_error "Unsupported macOS architecture";;
         esac
