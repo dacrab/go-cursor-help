@@ -53,7 +53,8 @@ try {
     # Get latest release
     $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
     $version = $latestRelease.tag_name.TrimStart('v')
-    $binaryName = "cursor-id-modifier_Windows_x86_64"
+    $binaryPrefix = "cursor-id-modifier_Windows_x86_64"
+    $binaryName = "${binaryPrefix}_${version}"
     $asset = $latestRelease.assets | Where-Object { $_.name -eq $binaryName } | Select-Object -First 1
     
     if (-not $asset) {

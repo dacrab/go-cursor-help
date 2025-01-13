@@ -36,7 +36,8 @@ archives:
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}_
+      {{- .Version }}
     format: binary
     builds:
       - cursor-id-modifier
@@ -51,7 +52,8 @@ archives:
     name_template: >-
       {{ .ProjectName }}_
       {{- if eq .Os "darwin" }}macOS{{ else }}{{ title .Os }}{{ end }}_
-      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}_
+      {{- .Version }}
     format: binary
     builds:
       - cursor-id-modifier
@@ -66,7 +68,8 @@ archives:
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}_
+      {{- .Version }}
     format: binary
     builds:
       - cursor-id-modifier
@@ -79,12 +82,12 @@ archives:
 
 universal_binaries:
   - replace: true
-    name_template: "{{ .ProjectName }}"
+    name_template: "{{ .ProjectName }}_{{ .Version }}"
     ids:
       - cursor-id-modifier
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: 'checksums_{{ .Version }}.txt'
   algorithm: sha256
 
 release:

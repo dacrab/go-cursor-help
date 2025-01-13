@@ -33,17 +33,17 @@ OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$OS" in
     linux)  
         ARCH="x86_64"
-        BINARY_NAME="cursor-id-modifier_Linux_x86_64"
+        BINARY_PREFIX="cursor-id-modifier_Linux_x86_64"
         ;;
     darwin) 
         case "$(uname -m)" in
             x86_64)         
                 ARCH="x86_64"
-                BINARY_NAME="cursor-id-modifier_macOS_x86_64"
+                BINARY_PREFIX="cursor-id-modifier_macOS_x86_64"
                 ;;
             aarch64|arm64)  
                 ARCH="arm64"
-                BINARY_NAME="cursor-id-modifier_macOS_arm64"
+                BINARY_PREFIX="cursor-id-modifier_macOS_arm64"
                 ;;
             *)             handle_error "Unsupported macOS architecture";;
         esac
@@ -62,6 +62,7 @@ mkdir -p "$INSTALL_DIR" || handle_error "Failed to create installation directory
 print_msg "$BLUE" "Fetching latest release..."
 LATEST_URL="https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
 VERSION=$(curl -s "$LATEST_URL" | grep "tag_name" | cut -d'"' -f4 | sed 's/^v//')
+BINARY_NAME="${BINARY_PREFIX}_${VERSION}"
 
 DOWNLOAD_URL=$(curl -s "$LATEST_URL" | grep -o "\"browser_download_url\": \"[^\"]*${BINARY_NAME}[^\"]*\"" | cut -d'"' -f4)
 
