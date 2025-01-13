@@ -33,48 +33,46 @@ builds:
 
 archives:
   - id: windows
-    name_template: "go-cursor-help_windows"
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
     format: binary
     builds:
       - cursor-id-modifier
-    wrap_in_directory: false
     files:
       - none*
     allow_different_binary_count: true
-    replacements:
-      windows: Windows
-      amd64: x86_64
     format_overrides:
       - goos: windows
         format: binary
 
   - id: macos
-    name_template: "go-cursor-help_macos"
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- if eq .Os "darwin" }}macOS{{ else }}{{ title .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
     format: binary
     builds:
       - cursor-id-modifier
-    wrap_in_directory: false
     files:
       - none*
     allow_different_binary_count: true
-    replacements:
-      darwin: macOS
     format_overrides:
       - goos: darwin
         format: binary
 
   - id: linux
-    name_template: "go-cursor-help_linux"
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
     format: binary
     builds:
       - cursor-id-modifier
-    wrap_in_directory: false
     files:
       - none*
     allow_different_binary_count: true
-    replacements:
-      linux: Linux
-      amd64: x86_64
     format_overrides:
       - goos: linux
         format: binary
