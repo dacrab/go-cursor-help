@@ -8,79 +8,60 @@ BLUE='\033[0;36m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Function to print colored messages
+# Print colored message
 print_msg() {
-    local color=$1
-    local msg=$2
-    echo -e "${color}${msg}${NC}"
+    echo -e "${1}${2}${NC}"
 }
 
-# Function to handle errors
-handle_error() {
+# Handle errors and cleanup
+cleanup() {
+    [ -d "$TMP_DIR" ] && rm -rf "$TMP_DIR"
+}
+
+trap cleanup EXIT
+
+die() {
     print_msg "$RED" "Error: $1"
     exit 1
 }
 
-# Temporary directory for downloads
+# Setup
 TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
+INSTALL_DIR="/usr/local/bin"
+command -v curl >/dev/null 2>&1 || die "curl is required"
+mkdir -p "$INSTALL_DIR" || die "Failed to create installation directory"
 
-# Check dependencies
-command -v curl >/dev/null 2>&1 || handle_error "curl is required"
-
-# Detect system
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-case "$OS" in
-    linux)  
-        ARCH="x86_64"
+# Detect system and binary
+case "$(uname -s)" in
+    Linux)  
         BINARY_PREFIX="cursor-id-modifier_Linux_x86_64"
         ;;
-    darwin) 
-        case "$(uname -m)" in
-            x86_64)         
-                ARCH="x86_64"
-                BINARY_PREFIX="cursor-id-modifier_macOS_universal"
-                ;;
-            aarch64|arm64)  
-                ARCH="arm64"
-                BINARY_PREFIX="cursor-id-modifier_macOS_universal"
-                ;;
-            *)             handle_error "Unsupported macOS architecture";;
-        esac
+    Darwin)
+        BINARY_PREFIX="cursor-id-modifier_macOS_universal"
         ;;
-    *)     handle_error "Unsupported OS";;
+    *) 
+        die "Unsupported OS"
+        ;;
 esac
 
 print_msg "$BLUE" "Starting installation..."
-print_msg "$GREEN" "Detected: $OS $ARCH"
 
-# Set install directory
-INSTALL_DIR="/usr/local/bin"
-mkdir -p "$INSTALL_DIR" || handle_error "Failed to create installation directory"
-
-# Get latest release
-print_msg "$BLUE" "Fetching latest release..."
+# Download and install latest release
 LATEST_URL="https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
-VERSION=$(curl -s "$LATEST_URL" | grep "tag_name" | cut -d'"' -f4 | sed 's/^v//')
-BINARY_NAME="${BINARY_PREFIX}_${VERSION}"
+VERSION=$(curl -s "$LATEST_URL" | grep "tag_name" | cut -d'"' -f4)
+DOWNLOAD_URL=$(curl -s "$LATEST_URL" | grep -o "\"browser_download_url\": \"[^\"]*${BINARY_PREFIX}[^\"]*\"" | cut -d'"' -f4)
 
-DOWNLOAD_URL=$(curl -s "$LATEST_URL" | grep -o "\"browser_download_url\": \"[^\"]*${BINARY_NAME}[^\"]*\"" | cut -d'"' -f4)
+[ -z "$DOWNLOAD_URL" ] && die "Binary not found"
 
-[ -z "$DOWNLOAD_URL" ] && handle_error "Binary not found for $OS $ARCH"
+print_msg "$BLUE" "Downloading version $VERSION..."
 
-print_msg "$GREEN" "Found: $BINARY_NAME"
-print_msg "$BLUE" "Downloading..."
-
-# Install binary
-curl -#L "$DOWNLOAD_URL" -o "$TMP_DIR/cursor-id-modifier"
+curl -#L "$DOWNLOAD_URL" -o "$TMP_DIR/cursor-id-modifier" || die "Download failed"
 chmod +x "$TMP_DIR/cursor-id-modifier"
 sudo mv "$TMP_DIR/cursor-id-modifier" "$INSTALL_DIR/"
 
 print_msg "$GREEN" "Installation complete!"
 print_msg "$BLUE" "Running cursor-id-modifier..."
 
-# Run the program
+# Run with automated mode
 export AUTOMATED_MODE=1
-if ! sudo -E cursor-id-modifier; then
-    handle_error "Failed to run cursor-id-modifier"
-fi
+sudo -E cursor-id-modifier || die "Failed to run cursor-id-modifier"

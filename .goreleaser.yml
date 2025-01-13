@@ -36,8 +36,7 @@ archives:
     name_template: >-
       {{ .ProjectName }}_
       {{- if eq .Os "darwin" }}macOS{{ else }}{{ title .Os }}{{ end }}_
-      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}_
-      {{- .Version }}
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
     format: binary
     builds:
       - cursor-id-modifier
@@ -50,7 +49,7 @@ archives:
 
 universal_binaries:
   - replace: true
-    name_template: "{{ .ProjectName }}_macOS_universal_{{ .Version }}"
+    name_template: "{{ .ProjectName }}_macOS_universal"
     ids:
       - cursor-id-modifier
 

@@ -1,104 +1,70 @@
-# Set execution policy for current process
+# Set execution policy and TLS protocol
 Set-ExecutionPolicy Bypass -Scope Process -Force
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# Check for admin rights and elevate if needed
+# Check for admin rights
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 if (-NOT $isAdmin) {
-    try {
-        Write-Host "Requesting administrator privileges..." -ForegroundColor Cyan
-        $pwshPath = (Get-Command "pwsh" -ErrorAction SilentlyContinue).Source
-        if (-not $pwshPath) {
-            $pwshPath = "powershell.exe"
-        }
-        
-        Start-Process -FilePath $pwshPath -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs -Wait
-        exit $LASTEXITCODE
-    }
-    catch {
-        Write-Host "Error: Administrator privileges required." -ForegroundColor Red
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
+    Write-Host "Requesting administrator privileges..." -ForegroundColor Cyan
+    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs -Wait
+    exit $LASTEXITCODE
 }
 
-# Initialize
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# Initialize paths
 $TmpDir = Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString())
 $InstallDir = "$env:ProgramFiles\CursorModifier"
 
 # Create directories
-New-Item -ItemType Directory -Path $TmpDir -Force | Out-Null
-New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+New-Item -ItemType Directory -Force -Path $TmpDir, $InstallDir | Out-Null
 
 # Cleanup function
 function Cleanup {
-    if (Test-Path $TmpDir) {
-        Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
-    }
+    Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
 }
 
-# Error handler
-trap {
-    Write-Host "Error: $_" -ForegroundColor Red
-    Cleanup
-    Read-Host "Press Enter to exit"
-    exit 1
-}
-
-# Main installation
 try {
     Write-Host "Starting installation..." -ForegroundColor Cyan
     
+    # Verify system requirements
     if (-not [Environment]::Is64BitOperatingSystem) {
-        throw "This tool only supports 64-bit Windows (x64)"
+        throw "This tool only supports 64-bit Windows"
     }
     
-    # Get latest release
-    $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
-    $version = $latestRelease.tag_name.TrimStart('v')
-    $binaryPrefix = "cursor-id-modifier_Windows_x86_64"
-    $binaryName = "${binaryPrefix}_${version}.zip"
-    $asset = $latestRelease.assets | Where-Object { $_.name -eq $binaryName } | Select-Object -First 1
+    # Get latest release info
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/yuaotian/go-cursor-help/releases/latest"
+    $asset = $release.assets | Where-Object { $_.name -like "cursor-id-modifier_Windows_x86_64*" } | Select-Object -First 1
     
     if (-not $asset) {
-        throw "No compatible binary found for Windows x64"
+        throw "No compatible binary found"
     }
+    
+    Write-Host "Downloading version $($release.tag_name)..." -ForegroundColor Cyan
     
     # Download and install
     $zipPath = Join-Path $TmpDir "cursor-id-modifier.zip"
-    $webClient = New-Object System.Net.WebClient
-    $webClient.Headers.Add("User-Agent", "PowerShell Script")
-    $webClient.DownloadFile($asset.browser_download_url, $zipPath)
+    (New-Object Net.WebClient).DownloadFile($asset.browser_download_url, $zipPath)
     
-    # Extract zip
     Expand-Archive -Path $zipPath -DestinationPath $TmpDir -Force
-    $binaryPath = Join-Path $TmpDir "cursor-id-modifier.exe"
+    Copy-Item -Path (Join-Path $TmpDir "cursor-id-modifier.exe") -Destination $InstallDir -Force
     
-    Copy-Item -Path $binaryPath -Destination "$InstallDir\cursor-id-modifier.exe" -Force
-    
-    # Update PATH if needed
+    # Add to PATH
     $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
     if ($currentPath -notlike "*$InstallDir*") {
         [Environment]::SetEnvironmentVariable("Path", "$currentPath;$InstallDir", "Machine")
     }
     
-    Write-Host "Installation completed successfully!" -ForegroundColor Green
-    Write-Host "Running cursor-id-modifier..." -ForegroundColor Cyan
+    Write-Host "Installation complete!" -ForegroundColor Green
     
     # Run program
-    Start-Process -FilePath "$InstallDir\cursor-id-modifier.exe" -Wait -NoNewWindow
-    if ($LASTEXITCODE -ne 0) {
+    $process = Start-Process -FilePath "$InstallDir\cursor-id-modifier.exe" -Wait -NoNewWindow -PassThru
+    if ($process.ExitCode -ne 0) {
         throw "Program execution failed"
     }
 }
 catch {
-    Write-Host "Installation failed: $_" -ForegroundColor Red
+    Write-Host "Error: $_" -ForegroundColor Red
     exit 1
 }
 finally {
     Cleanup
-    if ($LASTEXITCODE -ne 0) {
-        Read-Host "Press Enter to exit"
-    }
 }
